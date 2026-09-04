@@ -37,4 +37,7 @@ jobs:
           VERSION=$(basename "$APK" .apk | sed 's/PeppaGarden-//')
           TAG="test-v$VERSION"
           if gh release view "$TAG" >/dev/null 2>&1; then echo 'Verified release already exists'; exit 0; fi
-          gh release create "$TAG" "$APK" verified/home-landscape.png verified/game-landscape.png verified/stickers-landscape.png verified/editable-source.zip verified/game-test-results.txt verified/package-info.txt verified/permissions.txt verified/SHA256SUMS.txt verified/INSTALL.txt --target "$BUILD_SHA" --prerelease --title "佩奇欢乐打地鼠 $VERSION 测试版" --notes '安卓横屏离线测试版。官网角色图片和全部游戏内容已内置；十关洞数、单目标、计分、暂停、角色选择、贴纸持久化已通过云端自动测试。APK 签名及无联网权限已检查。实机一加 Ace 5 安装和声音效果待实际体验确认。下载 PeppaGarden 的 .apk 文件即可安装，其他文件为源码、截图和测试记录。'
+          RELEASE_SHA=$(gh api repos/$GH_REPO/commits/main --jq .sha)
+          CHANGED=$(gh api "repos/$GH_REPO/compare/$BUILD_SHA...$RELEASE_SHA" --jq '.files[].filename')
+          if printf '%s\n' "$CHANGED" | grep -v -E '^($|\.github/workflows/publish-test\.yml$)'; then echo 'Game sources changed since verified build'; exit 1; fi
+          gh release create "$TAG" "$APK" verified/home-landscape.png verified/game-landscape.png verified/stickers-landscape.png verified/editable-source.zip verified/game-test-results.txt verified/package-info.txt verified/permissions.txt verified/SHA256SUMS.txt verified/INSTALL.txt --target "$RELEASE_SHA" --prerelease --title "佩奇欢乐打地鼠 $VERSION 测试版" --notes "安卓横屏离线测试版。官网角色图片和全部游戏内容已内置；十关洞数、单目标、计分、暂停、角色选择、贴纸持久化已通过云端自动测试。APK 签名及无联网权限已检查。实机一加 Ace 5 安装和声音效果待实际体验确认。下载 PeppaGarden 的 .apk 文件即可安装，其他文件为源码、截图和测试记录。构建代码：$BUILD_SHA。"
