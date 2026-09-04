@@ -1,40 +1,207 @@
-name: Build APK
-
+name: Build offline APK
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
-
+    branches: [main]
+    paths: [index.html]
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
-      - uses: android-actions/setup-android@v3
-      - name: Prepare offline PWA files
-        run: |
-          cat > manifest.json <<'EOF'
-          {"name":"佩奇欢乐打地鼠","short_name":"打地鼠","start_url":"./index.html","display":"fullscreen","background_color":"#bfe58b","theme_color":"#f6a6bd","icons":[]}
-          EOF
-          cat > service-worker.js <<'EOF'
-          self.addEventListener('install',e=>e.waitUntil(caches.open('app-v1').then(c=>c.addAll(['./','./index.html','./manifest.json']))));
-          self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
-          EOF
-          sed -i 's#</head>#<link rel="manifest" href="manifest.json"><script>navigator.serviceWorker\.register("service-worker.js")</script></head>#' index.html
-      - name: Build Android APK
-        run: |
-          npm install -g @bubblewrap/cli
-          printf 'n\n' | bubblewrap init --manifest manifest.json --directory twa
-          bubblewrap build --directory twa --skipPwaValidation
-      - uses: actions/upload-artifact@v4
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          name: peppa-whack-a-mole-apk
-          path: twa/app-release-signed.apk
+          gradle-version: '8.9'
+      - name: Prepare native offline Android project
+        shell: python
+        run: |
+          from pathlib import Path
+          import shutil, urllib.request, os
+          def put(path, text):
+              p=Path(path); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(text,encoding='utf-8')
+          put('settings.gradle', '''pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name='PeppaGarden'
+          include ':app'
+          ''')
+          put('build.gradle', "plugins { id 'com.android.application' version '8.7.3' apply false }")
+          put('gradle.properties', 'android.useAndroidX=true\norg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8\n')
+          put('app/build.gradle', '''plugins { id 'com.android.application' }
+          android {
+            namespace 'com.tyson.peppagarden'
+            compileSdk 35
+            defaultConfig {
+              applicationId 'com.tyson.peppagarden'
+              minSdk 26
+              targetSdk 35
+              versionCode 2
+              versionName '0.2.0'
+              testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+            }
+            compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+          }
+          dependencies { implementation 'androidx.webkit:webkit:1.12.1' }
+          ''')
+          put('app/src/main/AndroidManifest.xml', '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <application android:label="佩奇欢乐打地鼠" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:icon="@drawable/icon" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+            <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden">
+              <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+            </activity>
+          </application></manifest>''')
+          put('app/src/main/res/drawable/icon.xml', '''<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+          <path android:fillColor="#F8BCD5" android:pathData="M0,0H108V108H0Z"/>
+          <path android:fillColor="#FFFFFF" android:pathData="M54,18L64,40L89,43L70,59L76,84L54,72L32,84L38,59L19,43L44,40Z"/>
+          <path android:fillColor="#FFD056" android:pathData="M54,29L61,46L78,48L65,60L69,77L54,68L39,77L43,60L30,48L47,46Z"/>
+          </vector>''')
+          put('app/src/main/java/com/tyson/peppagarden/MainActivity.java', '''package com.tyson.peppagarden;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.WindowManager;
+          import android.webkit.*;
+          import androidx.webkit.WebViewAssetLoader;
+          import java.io.ByteArrayInputStream;
+          public class MainActivity extends Activity {
+            private WebView web;
+            @Override public void onCreate(Bundle b) {
+              super.onCreate(b);
+              getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+              web=new WebView(this);
+              web.setBackgroundColor(0xffa5dceb);
+              WebSettings s=web.getSettings();
+              s.setJavaScriptEnabled(true); s.setDomStorageEnabled(true);
+              s.setAllowFileAccess(false); s.setAllowContentAccess(false);
+              s.setSupportZoom(false); s.setMediaPlaybackRequiresUserGesture(true);
+              s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+              final WebViewAssetLoader assets=new WebViewAssetLoader.Builder().addPathHandler("/assets/",new WebViewAssetLoader.AssetsPathHandler(this)).build();
+              web.setWebViewClient(new WebViewClient() {
+                @Override public WebResourceResponse shouldInterceptRequest(WebView v,WebResourceRequest r) {
+                  WebResourceResponse local=assets.shouldInterceptRequest(r.getUrl());
+                  return local!=null?local:new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0]));
+                }
+                @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r) { return true; }
+              });
+              web.setWebChromeClient(new WebChromeClient());
+              setContentView(web); immersive();
+              web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+            }
+            private void immersive() { getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LAYOUT_STABLE); }
+            @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if(focus) immersive(); }
+            @Override protected void onPause() { if(web!=null){web.evaluateJavascript("window.nativePause&&window.nativePause()",null);web.onPause();} super.onPause(); }
+            @Override protected void onResume() { super.onResume(); if(web!=null)web.onResume(); }
+            @Override public void onBackPressed() { if(web!=null)web.evaluateJavascript("window.nativeBack&&window.nativeBack()",null); }
+            @Override protected void onDestroy() { if(web!=null){web.destroy();web=null;} super.onDestroy(); }
+          }''')
+          assets=Path('app/src/main/assets'); (assets/'assets').mkdir(parents=True,exist_ok=True)
+          shutil.copyfile('index.html',assets/'index.html')
+          images={'peppa':'442b7436-d438-4d8f-8b40-03e07f0db72d/peppa_pig.webp','george':'6b0f945a-5907-43c2-a447-7e5ad83ce037/georgepig.webp','daddy':'8dbc37e1-6cd1-453d-91a0-032f31f7d9e1/daddy_pig.webp','mummy':'59542fe8-2ef5-439f-a0dd-e144a4f12010/mummy_pig.webp'}
+          base='https://assets-us-01.kc-usercontent.com/500e0a65-283d-00ef-33b2-7f1f20488fe2/'
+          for name,url in images.items():
+              with urllib.request.urlopen(base+url,timeout=60) as response: data=response.read()
+              assert data[:4]==b'RIFF' and len(data)>1000, 'Invalid artwork: '+name
+              (assets/'assets'/(name+'.webp')).write_bytes(data)
+          put('ART-SOURCES.txt','Artwork reference: https://peppapig-next-main.digital.hasbro.com/characters\n'+'\n'.join(base+u for u in images.values()))
+      - name: Install cloud build components
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build signed test APK
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Validate APK package and offline permissions
+        run: |
+          mkdir -p deliverables
+          cp app/build/outputs/apk/debug/app-debug.apk deliverables/PeppaGarden-0.2.0.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose deliverables/PeppaGarden-0.2.0.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging deliverables/PeppaGarden-0.2.0.apk | tee deliverables/package-info.txt
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions deliverables/PeppaGarden-0.2.0.apk | tee deliverables/permissions.txt
+          if grep -q 'android.permission.INTERNET' deliverables/permissions.txt; then exit 1; fi
+          unzip -l deliverables/PeppaGarden-0.2.0.apk | grep 'assets/assets/.*webp'
+          cd deliverables && sha256sum PeppaGarden-0.2.0.apk > SHA256SUMS.txt
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install cloud UI test browser
+        run: |
+          npm install --no-save playwright@1.51.1
+          npx playwright install chromium
+      - name: Verify game and capture landscape screenshots
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+          server=subprocess.Popen(['python3','-m','http.server','8765','--directory','app/src/main/assets'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+          Path('qa.cjs').write_text('''const {chromium}=require('playwright');
+          const fs=require('fs');
+          const assert=require('assert/strict');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+            const page=await browser.newPage({viewport:{width:1000,height:450},deviceScaleFactor:1});
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:8765/');
+            await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
+            await page.screenshot({path:'deliverables/home-landscape.png'});
+            await page.clock.install();
+            const counts=[9,11,13,15,17,19,21,23,25,25];
+            for(let i=0;i<10;i++){
+              await page.locator('[data-level="'+i+'"]').click({force:true});
+              await page.locator('#startBtn').click({force:true});
+              assert.equal(await page.locator('.hole').count(),counts[i]);
+              await page.clock.runFor(900);
+              assert.equal(await page.locator('.target').count(),1);
+              await page.locator('.hole:has(.target)').click({force:true});
+              assert.equal(await page.locator('#score').textContent(),'1');
+              await page.locator('.hole').first().click({force:true});
+              assert.equal(await page.locator('#score').textContent(),'1');
+              await page.locator('#pauseBtn').click({force:true});
+              const before=await page.locator('#seconds').textContent();
+              await page.clock.runFor(5000);
+              assert.equal(await page.locator('#seconds').textContent(),before);
+              await page.locator('#resumeBtn').click({force:true});
+              await page.clock.runFor(31000);
+              assert.equal(await page.locator('#seconds').textContent(),'0');
+              assert.equal(await page.locator('.target').count(),0);
+              await page.locator('#resultHome').click({force:true});
+            }
+            for(let i=0;i<6;i++){
+              await page.locator('[data-char="'+i+'"]').click({force:true});
+              await page.locator('#startBtn').click({force:true});
+              await page.clock.runFor(900);
+              assert.equal(await page.locator('.target').count(),1);
+              if(i===1)await page.screenshot({path:'deliverables/game-landscape.png'});
+              await page.locator('#backBtn').click({force:true});
+              await page.locator('#exitBtn').click({force:true});
+            }
+            await page.reload();
+            const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('peppa-garden-v2')));
+            assert.equal(saved.stickers.length,10); assert.equal(saved.total,10);
+            await page.locator('#collectionBtn').click({force:true});
+            assert.equal(await page.locator('.sticker:not(.locked)').count(),10);
+            await page.screenshot({path:'deliverables/stickers-landscape.png'});
+            assert.deepEqual(errors,[]);
+            fs.writeFileSync('deliverables/game-test-results.txt','PASS: 10 level hole counts; single target; no duplicate score; pause freezes timer; 30-second completion; 6 characters; saved 10 stickers and 10 stars; no JS errors.\\nPhysical OnePlus Ace 5 installation and audio are pending real-device testing.\\n');
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1)});''',encoding='utf-8')
+          try: subprocess.run(['node','qa.cjs'],check=True)
+          finally: server.terminate()
+      - name: Bundle editable source and instructions
+        shell: python
+        run: |
+          from pathlib import Path
+          import zipfile
+          Path('deliverables/安装说明.txt').write_text('佩奇欢乐打地鼠 0.2.0 测试版\n将 PeppaGarden-0.2.0.apk 发到安卓手机后点击安装。\nAndroid 8.0 及以上，横屏。安装完成后首次打开即可离线游玩。\n角色、图片、音效均内置；无网络权限。\n这是测试签名包，后续新签名构建可能需要卸载旧版本后安装，卸载会清除收藏。\n实体一加 Ace 5 的安装、触感、声音仍需实机验证。\n',encoding='utf-8')
+          with zipfile.ZipFile('deliverables/editable-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in [Path('settings.gradle'),Path('build.gradle'),Path('gradle.properties'),Path('ART-SOURCES.txt'),Path('qa.cjs'),Path('.github/workflows/build-apk.yml')]: z.write(p,p.as_posix())
+              for p in Path('app').rglob('*'):
+                  if p.is_file() and 'build' not in p.parts: z.write(p,p.as_posix())
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PeppaGarden-Android-0.2.0
+          path: deliverables/
           if-no-files-found: error
+          retention-days: 30
