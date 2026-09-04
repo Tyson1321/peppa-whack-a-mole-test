@@ -16,6 +16,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -196,7 +197,7 @@ jobs:
           import zipfile
           Path('deliverables/安装说明.txt').write_text('佩奇欢乐打地鼠 0.2.0 测试版\n将 PeppaGarden-0.2.0.apk 发到安卓手机后点击安装。\nAndroid 8.0 及以上，横屏。安装完成后首次打开即可离线游玩。\n角色、图片、音效均内置；无网络权限。\n这是测试签名包，后续新签名构建可能需要卸载旧版本后安装，卸载会清除收藏。\n实体一加 Ace 5 的安装、触感、声音仍需实机验证。\n',encoding='utf-8')
           with zipfile.ZipFile('deliverables/editable-source.zip','w',zipfile.ZIP_DEFLATED) as z:
-              for p in [Path('settings.gradle'),Path('build.gradle'),Path('gradle.properties'),Path('ART-SOURCES.txt'),Path('qa.cjs'),Path('.github/workflows/build-apk.yml')]: z.write(p,p.as_posix())
+              for p in [Path('index.html'),Path('settings.gradle'),Path('build.gradle'),Path('gradle.properties'),Path('ART-SOURCES.txt'),Path('qa.cjs'),Path('.github/workflows/build-apk.yml')]: z.write(p,p.as_posix())
               for p in Path('app').rglob('*'):
                   if p.is_file() and 'build' not in p.parts: z.write(p,p.as_posix())
       - uses: actions/upload-artifact@v4
