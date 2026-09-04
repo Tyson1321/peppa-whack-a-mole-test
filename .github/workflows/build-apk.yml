@@ -31,7 +31,7 @@ jobs:
       - name: Build Android APK
         run: |
           npm install -g @bubblewrap/cli
-          bubblewrap init --manifest manifest.json --directory twa
+          printf 'n\n' | bubblewrap init --manifest manifest.json --directory twa
           bubblewrap build --directory twa --skipPwaValidation
       - uses: actions/upload-artifact@v4
         with:
