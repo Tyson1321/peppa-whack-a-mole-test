@@ -66,7 +66,9 @@ for i,blocks in enumerate(solutions):
   time.sleep(.3)
   if not evaluate('testing'):break
  assert evaluate('won'),('native trial failed',i,evaluate('document.getElementById("status").textContent'))
+ assert evaluate('(()=>{let r=document.querySelector("#modal .card").getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth})()'), 'Android completion dialog outside viewport'
  evaluate('document.getElementById("modal").hidden=true;draw()')
+ time.sleep(.3)
  with (out/('android-chapter-'+str(i+1)+'.png')).open('wb') as f:subprocess.run(['adb','exec-out','screencap','-p'],stdout=f,check=True)
 assert evaluate('qaErrors')==[],evaluate('qaErrors')
 ws.close()
