@@ -15,7 +15,7 @@ function cells(p,l){if(isRamp(p,l))return (p.r>=2?[[0,0],[0,1]]:[[0,0],[1,0]]).m
 function polygon(p,l){if(!isRamp(p,l))return null;let w=p.r>=2?1:2,h=p.r>=2?2:1;return ((p.r||0)%2?[[0,0],[0,h],[w,h]]:[[0,h],[w,h],[w,0]]).map(([x,y])=>[x+p.x,y+p.y]);}
 function solidAt(p,x,y,l){if(isRamp(p,l)){let v=polygon(p,l),sign=0;for(let i=0;i<3;i++){let a=v[i],b=v[(i+1)%3],cross=(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]);if(Math.abs(cross)<1e-7)continue;let s=Math.sign(cross);if(sign&&s!==sign)return false;sign=s}return true}return cells(p,l).some(([a,b])=>x>a+1e-5&&x<a+1-1e-5&&y>b+1e-5&&y<b+1-1e-5)}
 function occupied(l,ps){return new Set([...l.fixed,...ps.flatMap(p=>cells(p,l))].map(c=>key(...c)))}
-function canPlace(l,ps,p){if(!Number.isInteger(p.id)||p.id<0||p.id>=10||![p.x,p.y,p.r||0].every(Number.isInteger))return false;let o=occupied(l,ps.filter(a=>a.id!==p.id));return cells(p,l).every(([x,y])=>x>=0&&x<W&&y>=0&&y<H&&!o.has(key(x,y)))}
+function canPlace(l,ps,p){if(!Number.isInteger(p.id)||p.id<0||p.id>=10||![p.x,p.y,p.r||0].every(Number.isInteger))return false;let o=occupied(l,ps.filter(a=>a.id!==p.id));return cells(p,l).every(([x,y])=>x>=0&&x<W&&y>=2&&y<H&&!o.has(key(x,y)))}
 // Blocks have rigid click-connect faces. Whole connected assemblies carry load;
 // their centre of mass must lie over ground contacts, with a maximum six-cell span.
 function stability(l,ps){let terrain=new Set(l.fixed.map(c=>key(...c))),all=ps.flatMap(p=>cells(p,l)),remaining=new Map(all.map(c=>[key(...c),c])),groups=[];
