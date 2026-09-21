@@ -1,30 +1,22 @@
-const assert=require('node:assert/strict'),fs=require('node:fs'),E=require('../app/src/main/assets/engine.js');
-const p=(id,x,y,r=0)=>({id,x,y,r});
-const solutions=[
-[p(0,2,5),p(1,5,5),p(6,8,5)],
-[p(0,3,5),p(1,6,5),p(6,4,4),p(7,6,4),p(2,5,3),p(3,6,2)],
-[p(0,1,5),p(8,4,5),p(1,7,5),p(9,10,5),p(2,3,4),p(3,6,4)],
-[p(0,3,3,1),p(1,8,3,1),p(2,3,2),p(3,6,2)],
-[p(0,1,5),p(6,4,5),p(1,6,5),p(2,6,4),p(3,7,3),p(7,8,2)]
-];
-const alternatives=[
-[p(6,2,5),p(0,4,5),p(1,7,5)],
-solutions[1].map(q=>q.id===3?{...q,x:7}:q),
-[...solutions[2],p(6,4,3)],
-[p(0,3,3,1),p(1,8,3,1),p(6,3,2),p(2,5,2),p(8,8,2)],
-[...solutions[4],p(8,5,4)]
-];
-let count=0;function test(name,f){f();count++;console.log('PASS',name)}
+const test=require('node:test'),assert=require('node:assert/strict'),E=require('../app/src/main/assets/engine'),solutions=require('./solutions.json');
+const copy=x=>JSON.parse(JSON.stringify(x));
+const alternatives=copy(solutions);
+alternatives[0].find(p=>p.id===7).x=8;
+alternatives[1].find(p=>p.id===0).x=5;
+alternatives[2][0].id=2;
+alternatives[3].forEach(p=>p.x++);
+alternatives[4].find(p=>p.id===0).x=0;alternatives[4].find(p=>p.id===3).x=4;
 for(let i=0;i<5;i++){
- test('level '+(i+1)+' solution A',()=>assert.equal(E.check(E.levels[i],solutions[i]).ok,true));
- test('level '+(i+1)+' solution B',()=>assert.equal(E.check(E.levels[i],alternatives[i]).ok,true));
- test('level '+(i+1)+' empty fails',()=>assert.equal(E.check(E.levels[i],[]).ok,false));
- test('level '+(i+1)+' floating fails',()=>assert.equal(E.check(E.levels[i],[p(0,0,0)]).ok,false));
- test('level '+(i+1)+' duplicate fails',()=>assert.equal(E.check(E.levels[i],[...solutions[i],solutions[i][0]]).ok,false));
+ test('chapter '+(i+1)+' has two geometrically different usable solutions',()=>{for(const ps of [solutions[i],alternatives[i]]){const r=E.check(E.levels[i],ps);assert.equal(r.ok,true,r.reason);assert.ok(r.path.length>0)}assert.notEqual(E.signature(E.levels[i],solutions[i]),E.signature(E.levels[i],alternatives[i]))});
+ test('chapter '+(i+1)+' rejects empty, duplicate, overlap, outside and unsupported assemblies',()=>{let l=E.levels[i],s=solutions[i];assert.equal(E.check(l,[]).ok,false);assert.equal(E.check(l,[...s,s[0]]).ok,false);assert.equal(E.check(l,[{id:0,x:-1,y:1,r:0}]).ok,false);assert.equal(E.check(l,[{id:0,x:2,y:0,r:0}]).ok,false);assert.equal(E.check(l,[{id:0,x:4,y:0,r:0},{id:1,x:4,y:0,r:0}]).ok,false)});
+ test('chapter '+(i+1)+' every block respects all four rotations',()=>{for(let id=0;id<10;id++)for(let r=0;r<4;r++){let c=E.cells({id,x:0,y:0,r},E.levels[i]);assert.ok(c.length>=2);assert.ok(c.every(([x,y])=>x>=0&&y>=0));assert.equal(new Set(c.map(String)).size,c.length)}});
 }
-test('bridge missing span fails',()=>assert.equal(E.check(E.levels[0],solutions[0].filter(p=>p.id!==1)).ok,false));
-test('door collision rejected',()=>assert.equal(E.canPlace(E.levels[3],[],p(0,4,4)),false));
-test('out of bounds rejected',()=>assert.equal(E.canPlace(E.levels[0],[],p(0,11,1)),false));
-test('four rotations return same geometry',()=>assert.deepEqual(E.cells(p(4,0,0,4)),E.cells(p(4,0,0,0))));
-test('overlap rejected',()=>assert.equal(E.canPlace(E.levels[0],[p(0,2,5)],p(1,3,5)),false));
-fs.writeFileSync(__dirname+'/solutions.json',JSON.stringify(solutions,null,2));console.log(count+' rule checks passed');
+test('wide bridge needs a central pier even if both banks support it',()=>{const ps=solutions[0].filter(p=>p.id!==7);assert.equal(E.check(E.levels[0],ps).ok,false);assert.match(E.check(E.levels[0],ps).reason,/桥墩/)});
+test('boat clearance cannot be filled',()=>{let ps=[...solutions[0],{id:5,x:5,y:7,r:0}];assert.equal(E.check(E.levels[0],ps).ok,false)});
+test('stairs cannot pass by stacking a tall vertical tower at the target',()=>{let l=E.levels[1],ps=[{id:0,x:12,y:5,r:1},{id:3,x:11,y:4,r:0}];assert.equal(E.check(l,ps).ok,false)});
+test('cart requires correct ramp orientation and real sloping surface',()=>{let ps=copy(solutions[2]);ps.find(p=>p.id===9).r=0;assert.equal(E.check(E.levels[2],ps).ok,false);let q=copy(solutions[2]);q.find(p=>p.id===8).id=2;assert.equal(E.check(E.levels[2],q).ok,false)});
+test('cart rejects low overhead clearance',()=>{let l={...E.levels[2],fixed:[...E.levels[2].fixed,[8,6]]};assert.equal(E.check(l,solutions[2]).ok,false)});
+test('house needs clear room, continuous roof and both walls',()=>{let l=E.levels[3];assert.equal(E.check(l,[...solutions[3],{id:6,x:6,y:7,r:0}]).ok,false);for(let id of [0,1,2,4])assert.equal(E.check(l,solutions[3].filter(p=>p.id!==id)).ok,false)});
+test('picnic needs both route and shelter, not one of them',()=>{for(let id of [0,1,4])assert.equal(E.check(E.levels[4],solutions[4].filter(p=>p.id!==id)).ok,false)});
+test('ramp surface rises or descends smoothly',()=>{let l=E.levels[2];for(let r of [0,1]){let p={id:8,x:2,y:7,r},a=E.surfaces({...l,fixed:[]},[p],2.25)[0],b=E.surfaces({...l,fixed:[]},[p],3.75)[0];assert.equal(Math.sign(b-a),r===0?-1:1)}});
+test('budget and malformed placement are rejected',()=>{let l={...E.levels[0],budget:4};assert.equal(E.check(l,solutions[0]).ok,false);assert.equal(E.canPlace(l,[],{id:99,x:0,y:0,r:0}),false);assert.equal(E.canPlace(l,[],{id:1,x:.5,y:1,r:0}),false)});

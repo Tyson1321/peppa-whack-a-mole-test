@@ -1,17 +1,9 @@
-# 验证状态 — 2026-09-21
+# Version 2.0 verification
 
-构建及测试已通过。验证代码提交：94dd71ee3f5ca6cf689207115e2fca6e84034b3f。
+Local rules: 24 tests passed, including two geometrically different solutions for all five levels; structural span/support, boat clearance, ramp orientation, cart headroom, house interior/roof/walls, picnic route/shelter, invalid placements and budget.
 
-GitHub Actions：https://github.com/Tyson1321/peppa-whack-a-mole-test/actions/runs/35551256315
+Browser suite: five chapters solved with actual pointer clicks and rotations, animated trial gating, retry and improvement, drag-grab offset, return/undo, progressive hints, save/reload, free-workshop persistence, mobile portrait/landscape visibility. Run by GitHub Actions; inspect latest workflow result.
 
-- 30 项规则测试通过：每关两种有效结构，以及空布局、悬空、重复积木、断桥、门洞阻塞、越界、旋转及重叠。
-- Chromium 实际操作测试通过：五关点选、旋转、通关、重玩；拖动、撤销、渐进提示和进度保存。
-- 390×844 竖屏及 844×390 横屏检查通过。截图发现的横屏按钮溢出已修复，并新增按钮可见性断言。
-- Android APK 编译成功。
-- Android 11 / API 30 模拟器：APK 安装成功，离线首页渲染成功，原生触屏点击进入第一关，进程保持运行。安卓截图已人工查看。
-- 安装包 ZIP 完整性及必需资源检查通过。
+Android suite: installs the generated APK on Android 11/API 30, checks offline menu and first-level navigation using native taps; uploads screenshots.
 
-APK：PeppaBlocks-1.0.0.apk，77019 字节。
-SHA256：c6ea85256e7d271faab850578445ee7a259a48383af68a73638ad9b36d613180
-
-范围与限制：画面为立体角色插画与 2.5D 格子搭建，不是自由视角 3D 沙盒。中文旁白使用设备 TTS，并非动画原声；设备需有中文语音数据。没有在用户真实手机上验证，也未通过听音确认 TTS 发声。模拟器验证启动与第一关进入，五关完整操作验证在 Chromium 中完成。debug 签名包用于家庭侧载。
+Limitations: No physical-device or child playtest yet. Spoken output depends on an installed Chinese TTS voice. Structural checks model rigid click-connected assemblies; this is 2.5D, not a free-camera 3D physics game.

@@ -1,25 +1,25 @@
-# 佩奇的积木乐园
+# 佩奇的积木乐园 2.0 — 小小工程师
 
-五关离线儿童搭建游戏，Android 8.0+。佩奇一家 3D 风格插画，积木使用 2.5D 格子画面；不是自由视角三维沙盒。
+Offline Android block-building puzzles for children aged 5–6. Five connected story challenges, ten selectable blocks, no time limit. Build bridges, stairs, a cart route, a room and a combined picnic camp. Chinese narration uses the device's Chinese TTS voice; music and interaction sounds are synthesized locally.
 
-## 玩法
-选择关卡，拖动积木到格子，或先点积木再点格子。选中积木后旋转；拖回积木盒可移除。没有倒计时。每关有十块候选积木，第五关最多使用八块。支持撤销、重新搭、渐进提示、完成记录和重玩。
+## What changed from 1.0
+- No exact-cell solution mask: success depends on a traversable surface, slope, headroom, clear room and ground support.
+- Real triangular slope geometry: four orientations provide gentle/steep ascending/descending ramps. Carts cannot climb vertical steps.
+- Animated Peppa-family trial follows the validated path, stops at obstacles, and highlights the problem after repeated attempts.
+- Click-connected rigid assemblies: centre-of-mass, support spans and overhang checks. This is a simplified 2.5D structural model, not a full 3D rigid-body simulator.
+- Five levels have at least two tested geometrically different solutions. Room and shelter placement is flexible within the scene.
+- Free workshop, draft autosave, undo, return to tray, best piece count and distinct-build records.
+- First completion earns two stars; using the chapter's target block count or fewer earns a third. All chapters remain accessible.
 
-判定：积木吸附后视作互锁的刚体结构，检查碰撞、连通、重心与地形支撑、目标覆盖、台阶可达性和门洞空间。不是实时动力学模拟。圆柱和三角形占一格，碰撞采用该格的外包框。
+## Controls
+Drag a block from the tray, or select it and tap a location. Drag an existing block without changing the grab offset. Select and rotate; return a block with 收回. 请大家试一试 runs a visible trial. 继续改进 preserves the current build. 再搭一种 clears it with undo available. Drafts and progress save locally.
 
-第一关搭桥，第二关台阶，第三关高低路，第四关房子，第五关桥与台阶综合。每关两种有效结构已写入规则测试。语音为设备中文 TTS，并非动画原声；设备需安装中文语音数据。音乐与操作音由 Web Audio 本地合成。不需要网络权限。
+## Build and tests
+`node tests/engine.test.js`
+`npm install --no-save playwright@1.51.1 && npx playwright install --with-deps chromium`
+`node tests/ui.test.js`
+`gradle --no-daemon :app:assembleDebug`
 
-## 验证和构建
-```
-node tests/engine.test.js
-npm install --no-save playwright@1.51.1
-npx playwright install --with-deps chromium
-node tests/ui.test.js
-gradle :app:assembleDebug
-```
-JDK 17、Gradle 8.9、Android SDK 35。GitHub Actions 执行规则及浏览器交互测试后生成 debug 签名可安装 APK。此 APK 适合家庭侧载测试，不是商店发布包。下载 Actions 的 `PeppaBlocks-APK` 产物解压安装。
+GitHub Actions runs rules and interaction checks, builds the APK and installs/launches it in an API 30 emulator. UI test screenshots and Android smoke screenshots are uploaded as artifacts. A child's playtest is still needed to assess enjoyment and tune difficulty.
 
-测试覆盖浏览器五关实际点选、旋转、完成、重玩、拖动、撤销、提示、进度保存及横竖屏。设备语音实际发声及 APK 真机触屏需要安装后确认，不把浏览器测试等同于真机验证。
-
-## 角色素材
-family.jpg 来自内置图像生成工具，提示要求忠实表现 Peppa 红裙、George 蓝衣与玩具龙、Mummy 橙裙、Daddy 青色衣服及眼镜，采用柔和 3D 玩具渲染。角色插画并非官方原始素材。
+Family artwork is stylized fan artwork. No original animation or voice recordings are included. No ads, accounts, purchases or network permission.
